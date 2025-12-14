@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Автоматизация оператора ДБО через Docker-контейнер
-Скачивает файлы из контейнера phishing-demo и автоматически открывает Excel файлы
+Скачивает файлы из контейнера phishing-demo и автоматически открывает только .xlsm файлы
 Логи выводятся в консоль
 
 ВСЁ В ОДНОМ ФАЙЛЕ - просто запустите: python dbo_automation.py
@@ -62,7 +62,7 @@ DOWNLOAD_DIR = str(USER_HOME / "Downloads")
 # Интервал проверки новых файлов (в секундах)
 CHECK_INTERVAL = 5
 
-# Автоматически открывать Excel файлы
+# Автоматически открывать только .xlsm файлы (файлы с макросами)
 AUTO_OPEN_EXCEL = True
 
 # Обрабатывать все файлы заново (игнорировать список обработанных)
@@ -380,13 +380,13 @@ class DBOOperatorAutomation:
             return None
     
     def open_excel_file(self, file_path):
-        """Открытие Excel файла для запуска VBA макросов"""
+        """Открытие .xlsm файла для запуска VBA макросов"""
         try:
             if not file_path.exists():
                 logger.error(f"❌ Файл не найден: {file_path}")
                 return False
             
-            logger.info(f"📂 Открытие Excel файла: {file_path.name}")
+            logger.info(f"📂 Открытие .xlsm файла: {file_path.name}")
             
             if platform.system() == "Windows":
                 subprocess.Popen(
@@ -403,7 +403,7 @@ class DBOOperatorAutomation:
                     stderr=subprocess.DEVNULL
                 )
             
-            logger.info(f"✓ Excel файл открыт: {file_path.name}")
+            logger.info(f"✓ .xlsm файл открыт: {file_path.name}")
             return True
             
         except Exception as e:
@@ -470,7 +470,7 @@ class DBOOperatorAutomation:
                 
                 if auto_open:
                     for file_path in downloaded_files:
-                        if file_path.suffix.lower() in ['.xls', '.xlsx', '.xlsm']:
+                        if file_path.suffix.lower() == '.xlsm':
                             self.open_excel_file(file_path)
                 
                 # Помечаем метаданные как обработанные
@@ -493,8 +493,8 @@ class DBOOperatorAutomation:
             if not target_path:
                 return False
             
-            # Открываем Excel файлы
-            if auto_open and target_path.suffix.lower() in ['.xls', '.xlsx', '.xlsm']:
+            # Открываем только .xlsm файлы
+            if auto_open and target_path.suffix.lower() == '.xlsm':
                 self.open_excel_file(target_path)
             
             return True
