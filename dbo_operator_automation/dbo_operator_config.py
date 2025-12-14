@@ -12,8 +12,13 @@ EMAIL_ADDRESS = "operator1@financepro.ru"
 EMAIL_PASSWORD = "1q2w#E$R"
 
 # Настройки IMAP сервера
-IMAP_SERVER = "10.18.2.6"  # IP адрес IMAP сервера
-IMAP_PORT = 993  # 993 для SSL, 143 для обычного подключения
+# Mailu доступен на удаленной машине (10.18.2.6)
+# Front сервис Mailu пробрасывает порты 143 и 993
+# TLS отключен (TLS_FLAVOR=notls в mailu.env), используем порт 143 без SSL
+IMAP_SERVER = "10.18.2.6"  # IP адрес удаленной машины с Mailu
+IMAP_PORT = 143  # 143 для обычного подключения (993 для SSL, но TLS отключен в Mailu)
+USE_SSL = False  # TLS отключен в Mailu (TLS_FLAVOR=notls)
+# Если порт 143 не работает, попробуйте 993 с USE_SSL = False
 
 # Директория для сохранения скачанных файлов
 # Используем папку Downloads пользователя

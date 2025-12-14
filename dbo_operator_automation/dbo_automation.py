@@ -47,7 +47,8 @@ def main():
         password=config.EMAIL_PASSWORD,
         imap_server=config.IMAP_SERVER,
         imap_port=config.IMAP_PORT,
-        download_dir=config.DOWNLOAD_DIR
+        download_dir=config.DOWNLOAD_DIR,
+        use_ssl=getattr(config, 'USE_SSL', True)
     )
     
     # Запускаем непрерывную проверку

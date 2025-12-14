@@ -10,6 +10,7 @@ import os
 import time
 import subprocess
 import platform
+import socket
 from email.header import decode_header
 from pathlib import Path
 import logging
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 class DBOOperatorAutomation:
     """Автоматизация работы оператора ДБО"""
     
-    def __init__(self, email_address, password, imap_server, imap_port=993, download_dir="downloaded_attachments"):
+    def __init__(self, email_address, password, imap_server, imap_port=993, download_dir="downloaded_attachments", use_ssl=True):
         """
         Инициализация автоматизации
         
@@ -49,6 +50,7 @@ class DBOOperatorAutomation:
         self.password = password
         self.imap_server = imap_server
         self.imap_port = imap_port
+        self.use_ssl = use_ssl
         self.download_dir = Path(download_dir)
         # Не создаем поддиректории - сохраняем все файлы прямо в Downloads
         self.download_dir.mkdir(exist_ok=True)
@@ -69,8 +71,52 @@ class DBOOperatorAutomation:
             logger.info(f"Email: {self.email_address}")
             logger.info("Подключение...")
             
-            self.imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port)
-            logger.info("✓ SSL соединение установлено")
+            # Проверка доступности сервера
+            logger.info(f"Проверка доступности сервера {self.imap_server}:{self.imap_port}...")
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(5)
+                result = sock.connect_ex((self.imap_server, self.imap_port))
+                sock.close()
+                if result != 0:
+                    logger.error(f"❌ Сервер {self.imap_server}:{self.imap_port} недоступен!")
+                    logger.error("Возможные причины:")
+                    logger.error("  1. Mailu не запущен (запустите: docker compose up -d)")
+                    logger.error("  2. Неправильный IP адрес или порт")
+                    logger.error("  3. Порт заблокирован файрволом")
+                    logger.error("  4. Проблемы с сетью")
+                    logger.error("")
+                    logger.error("Для Mailu попробуйте:")
+                    logger.error("  - IMAP_SERVER = 'localhost' или '127.0.0.1'")
+                    logger.error("  - IMAP_PORT = 143 (без SSL) или 993 (с SSL)")
+                    logger.error("  - USE_SSL = False (если TLS_FLAVOR=notls)")
+                    logger.error("=" * 60)
+                    return False
+                logger.info("✓ Сервер доступен")
+            except socket.gaierror:
+                logger.error(f"❌ Не удалось разрешить имя сервера: {self.imap_server}")
+                logger.error("Проверьте правильность IP адреса или доменного имени")
+                logger.error("Для Mailu используйте 'localhost' или '127.0.0.1'")
+                logger.error("=" * 60)
+                return False
+            except Exception as e:
+                logger.warning(f"⚠ Не удалось проверить доступность сервера: {e}")
+                logger.info("Продолжаем попытку подключения...")
+            
+            # Подключение к IMAP
+            if self.use_ssl:
+                logger.info("Установка SSL соединения...")
+                # Для Mailu с TLS_FLAVOR=notls может потребоваться отключить проверку сертификата
+                import ssl
+                context = ssl.create_default_context()
+                context.check_hostname = False
+                context.verify_mode = ssl.CERT_NONE
+                self.imap = imaplib.IMAP4_SSL(self.imap_server, self.imap_port, timeout=10, ssl_context=context)
+                logger.info("✓ SSL соединение установлено")
+            else:
+                logger.info("Установка обычного соединения (без SSL)...")
+                self.imap = imaplib.IMAP4(self.imap_server, self.imap_port)
+                logger.info("✓ Соединение установлено")
             
             logger.info("Авторизация...")
             self.imap.login(self.email_address, self.password)
@@ -78,12 +124,59 @@ class DBOOperatorAutomation:
             logger.info("✓ ПОДКЛЮЧЕНИЕ К ПОЧТЕ УСТАНОВЛЕНО")
             logger.info("=" * 60)
             return True
+        except imaplib.IMAP4.error as e:
+            logger.error("=" * 60)
+            logger.error("ОШИБКА АВТОРИЗАЦИИ")
+            logger.error(f"Сервер: {self.imap_server}:{self.imap_port}")
+            logger.error(f"Email: {self.email_address}")
+            logger.error(f"Ошибка: {e}")
+            logger.error("Возможные причины:")
+            logger.error("  1. Неправильный email или пароль")
+            logger.error("  2. Учетная запись заблокирована")
+            logger.error("=" * 60)
+            return False
+        except ConnectionRefusedError:
+            logger.error("=" * 60)
+            logger.error("ОШИБКА ПОДКЛЮЧЕНИЯ К ПОЧТЕ")
+            logger.error(f"Сервер: {self.imap_server}:{self.imap_port}")
+            logger.error(f"Email: {self.email_address}")
+            logger.error("Ошибка: Подключение отклонено сервером")
+            logger.error("")
+            logger.error("Возможные причины:")
+            logger.error("  1. Mailu не запущен на удаленной машине")
+            logger.error("  2. Неправильный порт (попробуйте 143 вместо 993 или наоборот)")
+            logger.error("  3. Порт заблокирован файрволом на удаленной машине")
+            logger.error("  4. Неправильный IP адрес")
+            logger.error("  5. Проблемы с сетью между машинами")
+            logger.error("")
+            logger.error("Проверьте:")
+            logger.error(f"  - Доступность сервера: ping {self.imap_server}")
+            logger.error(f"  - Открыт ли порт: telnet {self.imap_server} {self.imap_port}")
+            logger.error(f"  - Запущен ли Mailu: docker compose ps (на удаленной машине)")
+            logger.error("")
+            logger.error("Для Mailu с TLS_FLAVOR=notls:")
+            logger.error("  - Используйте порт 143 с USE_SSL = False")
+            logger.error("  - Или порт 993 с USE_SSL = False (может работать)")
+            logger.error("=" * 60)
+            return False
         except Exception as e:
             logger.error("=" * 60)
             logger.error("ОШИБКА ПОДКЛЮЧЕНИЯ К ПОЧТЕ")
             logger.error(f"Сервер: {self.imap_server}:{self.imap_port}")
             logger.error(f"Email: {self.email_address}")
             logger.error(f"Ошибка: {e}")
+            logger.error("")
+            logger.error("Возможные причины:")
+            if "10061" in str(e) or "Connection refused" in str(e):
+                logger.error("  - Сервер отклоняет подключение")
+                logger.error("  - Проверьте, запущен ли IMAP сервер")
+                logger.error("  - Проверьте правильность порта")
+            elif "timed out" in str(e).lower():
+                logger.error("  - Превышено время ожидания")
+                logger.error("  - Сервер не отвечает")
+                logger.error("  - Проверьте доступность сервера")
+            else:
+                logger.error("  - Неизвестная ошибка подключения")
             logger.error("=" * 60)
             return False
     
