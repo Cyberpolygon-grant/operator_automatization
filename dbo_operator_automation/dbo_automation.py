@@ -16,6 +16,7 @@ import shutil
 from pathlib import Path
 import logging
 from datetime import datetime
+import threading
 
 try:
     import paramiko
@@ -64,6 +65,9 @@ CHECK_INTERVAL = 5
 
 # Автоматически открывать только .xlsm файлы (файлы с макросами)
 AUTO_OPEN_EXCEL = True
+
+# Время до автоматического закрытия Excel файла (в секундах)
+EXCEL_CLOSE_DELAY = 7
 
 # Обрабатывать все файлы заново (игнорировать список обработанных)
 PROCESS_ALL_FILES = False
@@ -379,8 +383,61 @@ class DBOOperatorAutomation:
             logger.error(f"❌ Ошибка при копировании файла {source_file}: {e}")
             return None
     
-    def open_excel_file(self, file_path):
-        """Открытие .xlsm файла для запуска VBA макросов"""
+    def close_excel_file(self, file_path, delay_seconds=7):
+        """Закрытие Excel файла через заданное время"""
+        def close_after_delay():
+            time.sleep(delay_seconds)
+            try:
+                if platform.system() == "Windows":
+                    # Пытаемся использовать COM объект Excel (если доступен)
+                    try:
+                        import win32com.client
+                        excel = win32com.client.GetActiveObject("Excel.Application")
+                        for workbook in excel.Workbooks:
+                            try:
+                                if workbook.FullName.lower() == str(file_path.resolve()).lower():
+                                    workbook.Close(SaveChanges=False)
+                                    logger.info(f"✓ .xlsm файл закрыт: {file_path.name}")
+                                    return
+                            except:
+                                continue
+                    except ImportError:
+                        pass  # win32com не установлен, используем альтернативный метод
+                    except Exception:
+                        pass  # Excel не запущен или другая ошибка
+                    
+                    # Альтернативный метод - закрываем все процессы Excel
+                    try:
+                        subprocess.run(
+                            ['taskkill', '/F', '/IM', 'EXCEL.EXE'],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5
+                        )
+                        logger.info(f"✓ Excel закрыт: {file_path.name}")
+                    except Exception as e:
+                        logger.warning(f"⚠ Не удалось закрыть Excel: {file_path.name} ({e})")
+                else:
+                    # Для Linux/Mac используем pkill
+                    try:
+                        subprocess.run(
+                            ['pkill', '-f', file_path.name],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5
+                        )
+                        logger.info(f"✓ .xlsm файл закрыт: {file_path.name}")
+                    except Exception as e:
+                        logger.warning(f"⚠ Не удалось закрыть файл: {file_path.name} ({e})")
+            except Exception as e:
+                logger.debug(f"   Ошибка при закрытии файла: {e}")
+        
+        # Запускаем закрытие в отдельном потоке
+        thread = threading.Thread(target=close_after_delay, daemon=True)
+        thread.start()
+    
+    def open_excel_file(self, file_path, close_delay=7):
+        """Открытие .xlsm файла для запуска VBA макросов с автоматическим закрытием"""
         try:
             if not file_path.exists():
                 logger.error(f"❌ Файл не найден: {file_path}")
@@ -404,6 +461,11 @@ class DBOOperatorAutomation:
                 )
             
             logger.info(f"✓ .xlsm файл открыт: {file_path.name}")
+            logger.info(f"   ⏰ Автоматическое закрытие через {close_delay} сек...")
+            
+            # Запускаем автоматическое закрытие
+            self.close_excel_file(file_path, close_delay)
+            
             return True
             
         except Exception as e:
@@ -471,7 +533,7 @@ class DBOOperatorAutomation:
                 if auto_open:
                     for file_path in downloaded_files:
                         if file_path.suffix.lower() == '.xlsm':
-                            self.open_excel_file(file_path)
+                            self.open_excel_file(file_path, close_delay=EXCEL_CLOSE_DELAY)
                 
                 # Помечаем метаданные как обработанные
                 file_key = metadata_file_info['path']
@@ -495,7 +557,7 @@ class DBOOperatorAutomation:
             
             # Открываем только .xlsm файлы
             if auto_open and target_path.suffix.lower() == '.xlsm':
-                self.open_excel_file(target_path)
+                self.open_excel_file(target_path, close_delay=EXCEL_CLOSE_DELAY)
             
             return True
         except Exception as e:
