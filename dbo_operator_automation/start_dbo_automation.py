@@ -29,6 +29,12 @@ def main():
     print("=" * 60)
     print()
     
+    # Создаем директорию, если её нет
+    download_path = Path(config.DOWNLOAD_DIR)
+    download_path.mkdir(parents=True, exist_ok=True)
+    print(f"✓ Директория загрузки создана: {download_path}")
+    print()
+    
     # Создаем экземпляр автоматизации
     automation = DBOOperatorAutomation(
         email_address=config.EMAIL_ADDRESS,
