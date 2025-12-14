@@ -230,7 +230,10 @@ class DBOOperatorAutomation:
             self.remote_dir = None
             self.container_dir = Path(container_dir) if container_dir else None
             logger.info(f"Инициализация автоматизации (локальный режим)")
-            logger.info(f"Директория контейнера: {self.container_dir}")
+            if self.container_dir:
+                logger.info(f"Директория контейнера: {self.container_dir}")
+            else:
+                logger.warning(f"⚠ Директория контейнера не указана")
         
         logger.info(f"Директория загрузки: {self.download_dir}")
         if process_all:
@@ -506,8 +509,12 @@ class DBOOperatorAutomation:
                 return
             
             # Показываем информацию о директории
-            logger.debug(f"   Проверка директории: {self.container_dir}")
-            logger.debug(f"   Абсолютный путь: {self.container_dir.resolve()}")
+            if self.use_ssh:
+                logger.debug(f"   Проверка удаленной директории: {self.remote_dir}")
+            else:
+                logger.debug(f"   Проверка директории: {self.container_dir}")
+                if self.container_dir:
+                    logger.debug(f"   Абсолютный путь: {self.container_dir.resolve()}")
             
             metadata_files = self.get_new_metadata_files()
             
