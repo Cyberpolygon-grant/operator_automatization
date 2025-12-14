@@ -9,7 +9,7 @@ EMAIL_ADDRESS = "operator1@financepro.ru"
 EMAIL_PASSWORD = "1q2w#E$R"
 
 # Настройки IMAP сервера
-IMAP_SERVER = "localhost"  # или "mail.financepro.ru" для внешнего доступа
+IMAP_SERVER = "10.18.2.6"  # IP адрес IMAP сервера
 IMAP_PORT = 993  # 993 для SSL, 143 для обычного подключения
 
 # Директория для сохранения скачанных файлов
