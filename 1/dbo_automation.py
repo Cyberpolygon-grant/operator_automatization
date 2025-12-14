@@ -230,6 +230,8 @@ class DBOOperatorAutomation:
         self.download_dir.mkdir(parents=True, exist_ok=True)
         self.process_all = process_all
         self.processed_files = set()
+        self.start_time = datetime.now()  # Время запуска скрипта для фильтрации старых файлов
+        self.downloaded_files_times = {}  # {file_path: download_time} для отслеживания времени скачивания
         
         if use_ssh:
             self.ssh = SSHConnection(ssh_host, ssh_user, ssh_password, ssh_port)
