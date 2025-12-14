@@ -15,11 +15,7 @@ from pathlib import Path
 import logging
 from datetime import datetime
 
-# Настройка логирования
-log_dir = Path(__file__).parent
-log_file = log_dir / 'dbo_operator_automation.log'
-
-# Настройка форматирования с более подробной информацией
+# Настройка логирования - только в консоль
 log_format = '%(asctime)s [%(levelname)-8s] %(message)s'
 date_format = '%Y-%m-%d %H:%M:%S'
 
@@ -28,8 +24,7 @@ logging.basicConfig(
     format=log_format,
     datefmt=date_format,
     handlers=[
-        logging.FileHandler(log_file, encoding='utf-8'),
-        logging.StreamHandler()
+        logging.StreamHandler()  # Только консоль, без файла
     ]
 )
 
