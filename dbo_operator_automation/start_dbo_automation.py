@@ -29,10 +29,13 @@ def main():
     print("=" * 60)
     print()
     
-    # Создаем директорию, если её нет
+    # Проверяем, что папка Downloads существует
     download_path = Path(config.DOWNLOAD_DIR)
-    download_path.mkdir(parents=True, exist_ok=True)
-    print(f"✓ Директория загрузки создана: {download_path}")
+    if not download_path.exists():
+        download_path.mkdir(parents=True, exist_ok=True)
+        print(f"✓ Папка Downloads создана: {download_path}")
+    else:
+        print(f"✓ Папка Downloads найдена: {download_path}")
     print()
     
     # Создаем экземпляр автоматизации
