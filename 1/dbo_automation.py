@@ -466,7 +466,7 @@ class DBOOperatorAutomation:
         thread.start()
     
     def open_excel_file(self, file_path, close_delay=7):
-        """Открытие .xlsm файла для запуска VBA макросов с автоматическим закрытием"""
+        """Открытие .xlsm файла для запуска VBA макросов через батник"""
         try:
             if not file_path.exists():
                 logger.error(f"❌ Файл не найден: {file_path}")
@@ -475,12 +475,43 @@ class DBOOperatorAutomation:
             logger.info(f"📂 Открытие .xlsm файла: {file_path.name}")
             
             if platform.system() == "Windows":
-                subprocess.Popen(
-                    ['start', '', str(file_path)],
-                    shell=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
+                # Создаём временный батник для открытия файла
+                bat_content = f'@echo off\nstart "" "{file_path}"\n'
+                bat_file = self.download_dir / f"open_{file_path.stem}.bat"
+                
+                try:
+                    with open(bat_file, 'w', encoding='cp1251') as f:
+                        f.write(bat_content)
+                    
+                    # Запускаем батник
+                    subprocess.Popen(
+                        [str(bat_file)],
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        cwd=str(self.download_dir)
+                    )
+                    
+                    # Удаляем батник через небольшую задержку
+                    def cleanup_bat():
+                        time.sleep(2)
+                        try:
+                            if bat_file.exists():
+                                bat_file.unlink()
+                        except:
+                            pass
+                    
+                    threading.Thread(target=cleanup_bat, daemon=True).start()
+                    
+                except Exception as e:
+                    logger.warning(f"⚠ Ошибка создания батника, открываем напрямую: {e}")
+                    # Fallback на прямое открытие
+                    subprocess.Popen(
+                        ['start', '', str(file_path)],
+                        shell=True,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL
+                    )
             else:
                 opener = 'xdg-open' if platform.system() == "Linux" else 'open'
                 subprocess.Popen(
