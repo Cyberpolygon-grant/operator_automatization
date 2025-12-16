@@ -476,17 +476,20 @@ class DBOOperatorAutomation:
             
             if platform.system() == "Windows":
                 # Создаём временный батник для открытия файла
-                bat_content = f'@echo off\nstart "" "{file_path}"\n'
-                bat_file = self.download_dir / f"open_{file_path.stem}.bat"
+                file_path_abs = str(file_path.resolve())
+                # Экранируем кавычки в пути для батника
+                file_path_escaped = file_path_abs.replace('"', '""')
+                bat_content = f'@echo off\ncd /d "{os.path.dirname(file_path_abs)}"\nstart "" "{file_path_escaped}"\n'
+                
+                bat_file = self.download_dir / f"open_{file_path.stem}_{int(time.time())}.bat"
                 
                 try:
-                    with open(bat_file, 'w', encoding='cp1251') as f:
+                    with open(bat_file, 'w', encoding='cp866') as f:
                         f.write(bat_content)
                     
-                    # Запускаем батник
+                    # Запускаем батник через cmd
                     subprocess.Popen(
-                        [str(bat_file)],
-                        shell=True,
+                        ['cmd.exe', '/c', str(bat_file)],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         cwd=str(self.download_dir)
@@ -494,7 +497,7 @@ class DBOOperatorAutomation:
                     
                     # Удаляем батник через небольшую задержку
                     def cleanup_bat():
-                        time.sleep(2)
+                        time.sleep(3)
                         try:
                             if bat_file.exists():
                                 bat_file.unlink()
@@ -507,8 +510,7 @@ class DBOOperatorAutomation:
                     logger.warning(f"⚠ Ошибка создания батника, открываем напрямую: {e}")
                     # Fallback на прямое открытие
                     subprocess.Popen(
-                        ['start', '', str(file_path)],
-                        shell=True,
+                        ['cmd.exe', '/c', 'start', '', str(file_path)],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL
                     )
